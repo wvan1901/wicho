@@ -48,20 +48,6 @@ const (
 	TIME_FORMAT          = "[15:04:05.000]"
 )
 
-func colorString(colorAnsiCode int, v string) string {
-	return fmt.Sprintf("\033[%sm%s%s", strconv.Itoa(colorAnsiCode), v, ANSI_RESET_COLOR)
-}
-
-func colorSimple(fgColor int, bgColor int, v string) string {
-	if (fgColor < 30 || fgColor > 97) || (fgColor > 37 && fgColor < 90) {
-		fgColor = 39
-	}
-	if (bgColor < 40 || bgColor > 107) || (bgColor > 47 && bgColor < 100) {
-		bgColor = 49
-	}
-	return fmt.Sprintf("\033[%s;%sm%s%s", strconv.Itoa(fgColor), strconv.Itoa(bgColor), v, ANSI_RESET_COLOR)
-}
-
 type DevLogHandler struct {
 	opts Options
 	out  io.Writer
@@ -76,10 +62,33 @@ type Options struct {
 	Level slog.Leveler
 	// Enables or disables source code location
 	AddSource bool
-	// TODO: Add color custumization
+	// Customizable theme
+	theme Theme
 }
 
-func New(out io.Writer, opts *Options) *DevLogHandler {
+type Theme struct {
+	// Slog attrs kind
+	String      color
+	Time        color
+	Bool        color
+	Int         color
+	Group       color
+	AttrDefault color
+	// Log Levels
+	Debug color
+	Info  color
+	Warn  color
+	Error color
+	// Source File
+	SourceFile color
+}
+
+type color struct {
+	Fg int // Foreground
+	Bg int // Background
+}
+
+func New(out io.Writer, opts *Options, theme *Theme) *DevLogHandler {
 	h := &DevLogHandler{out: out, mu: &sync.Mutex{}}
 	if opts != nil {
 		h.opts = *opts
@@ -88,6 +97,24 @@ func New(out io.Writer, opts *Options) *DevLogHandler {
 	if h.opts.Level == nil {
 		h.opts.Level = slog.LevelInfo
 	}
+
+	if theme == nil {
+		// Set the default theme
+		theme = &Theme{
+			String:      color{Fg: ANSI_FG_LIGHTBLUE, Bg: ANSI_BG_BLACK},
+			Time:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTGREEN},
+			Bool:        color{Fg: ANSI_FG_LIGHTRED, Bg: ANSI_BG_BLACK},
+			Int:         color{Fg: ANSI_FG_LIGHTCYAN, Bg: ANSI_BG_BLACK},
+			Group:       color{Fg: ANSI_FG_WHITE, Bg: ANSI_BG_BLUE},
+			AttrDefault: color{Fg: ANSI_FG_LIGHTGREEN, Bg: ANSI_BG_BLACK},
+			Debug:       color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_DARKGRAY},
+			Info:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_CYAN},
+			Warn:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTYELLOW},
+			Error:       color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTRED},
+			SourceFile:  color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTMAGENTA},
+		}
+	}
+	h.opts.theme = *theme
 
 	return h
 }
@@ -102,13 +129,13 @@ func (h *DevLogHandler) Handle(ctx context.Context, r slog.Record) error {
 		buf = h.appendAttr(buf, slog.Time(slog.TimeKey, r.Time))
 	}
 
-	buf = fmt.Append(buf, handleLvl(r.Level)+" ")
+	buf = fmt.Append(buf, handleLvl(r.Level, h.opts.theme)+" ")
 
 	if r.PC != 0 && h.opts.AddSource {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
 		sourceStr := fmt.Sprintf(" %s:%d ", f.File, f.Line)
-		colorVal := colorSimple(ANSI_FG_BLACK, ANSI_BG_LIGHTMAGENTA, sourceStr)
+		colorVal := colorSimple(h.opts.theme.SourceFile, sourceStr)
 		buf = fmt.Append(buf, colorVal+" ")
 	}
 	buf = h.appendAttr(buf, slog.String(slog.MessageKey, r.Message))
@@ -152,18 +179,18 @@ func (h *DevLogHandler) appendAttr(buf []byte, a slog.Attr) []byte {
 	}
 	switch a.Value.Kind() {
 	case slog.KindString:
-		keyStr := colorSimple(ANSI_FG_LIGHTBLUE, ANSI_BG_BLACK, a.Key)
+		keyStr := colorSimple(h.opts.theme.String, a.Key)
 		buf = fmt.Append(buf, keyStr+"="+a.Value.String())
 	case slog.KindTime:
 		// Write the time in a standard way
 		timeStr := fmt.Sprintf("%s", a.Value.Time().Format(TIME_FORMAT))
-		colorStr := colorSimple(ANSI_FG_BLACK, ANSI_BG_LIGHTGREEN, timeStr)
+		colorStr := colorSimple(h.opts.theme.Time, timeStr)
 		buf = fmt.Append(buf, colorStr)
 	case slog.KindBool:
-		keyStr := colorSimple(ANSI_FG_LIGHTRED, ANSI_BG_BLACK, a.Key)
+		keyStr := colorSimple(h.opts.theme.Bool, a.Key)
 		buf = fmt.Appendf(buf, "%s=%s", keyStr, a.Value)
 	case slog.KindInt64:
-		keyStr := colorSimple(ANSI_FG_LIGHTCYAN, ANSI_BG_BLACK, a.Key)
+		keyStr := colorSimple(h.opts.theme.Int, a.Key)
 		buf = fmt.Appendf(buf, "%s=%s", keyStr, a.Value)
 	case slog.KindGroup:
 		attrs := a.Value.Group()
@@ -174,20 +201,20 @@ func (h *DevLogHandler) appendAttr(buf []byte, a slog.Attr) []byte {
 		// If key is non empty, write it out
 		// Otherwise inline the attrs
 		if a.Key != "" {
-			keyStr := colorSimple(0, ANSI_BG_BLUE, " "+a.Key+" ")
-			startStr := colorSimple(0, ANSI_BG_GREEN, " START ")
+			keyStr := colorSimple(h.opts.theme.Group, " "+a.Key+" ")
+			startStr := colorSimple(color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_GREEN}, " START ")
 			buf = fmt.Appendf(buf, "%s%s ", keyStr, startStr)
 		}
 		for _, ga := range attrs {
 			buf = h.appendAttr(buf, ga)
 		}
 		if a.Key != "" {
-			keyStr := colorSimple(0, ANSI_BG_BLUE, " "+a.Key+" ")
-			endStr := colorSimple(0, ANSI_BG_RED, " END ")
+			keyStr := colorSimple(h.opts.theme.Group, " "+a.Key+" ")
+			endStr := colorSimple(color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_RED}, " END ")
 			buf = fmt.Appendf(buf, "%s%s", keyStr, endStr)
 		}
 	default:
-		keyStr := colorSimple(ANSI_FG_LIGHTGREEN, ANSI_BG_BLACK, a.Key)
+		keyStr := colorSimple(h.opts.theme.AttrDefault, a.Key)
 		buf = fmt.Appendf(buf, "%s=%s", keyStr, a.Value)
 	}
 
@@ -224,17 +251,27 @@ func (h *DevLogHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return h.withGroupOrAttrs(groupOrAttrs{attrs: attrs})
 }
 
-func handleLvl(lvl slog.Level) string {
+func handleLvl(lvl slog.Level, t Theme) string {
 	lvlStr := " " + lvl.String() + " "
 	switch lvl {
 	case slog.LevelDebug:
-		return colorSimple(ANSI_FG_BLACK, ANSI_BG_DARKGRAY, lvlStr)
+		return colorSimple(t.Debug, lvlStr)
 	case slog.LevelInfo:
-		return colorSimple(ANSI_FG_BLACK, ANSI_BG_CYAN, lvlStr+" ")
+		return colorSimple(t.Info, lvlStr+" ")
 	case slog.LevelWarn:
-		return colorSimple(ANSI_FG_BLACK, ANSI_BG_LIGHTYELLOW, lvlStr+" ")
+		return colorSimple(t.Warn, lvlStr+" ")
 	case slog.LevelError:
-		return colorSimple(ANSI_FG_BLACK, ANSI_BG_LIGHTRED, lvlStr)
+		return colorSimple(t.Error, lvlStr)
 	}
-	return colorSimple(ANSI_FG_BLACK, ANSI_BG_WHITE, lvlStr)
+	return colorSimple(color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_WHITE}, lvlStr)
+}
+
+func colorSimple(c color, v string) string {
+	if (c.Fg < 30 || c.Fg > 97) || (c.Fg > 37 && c.Fg < 90) {
+		c.Fg = 39
+	}
+	if (c.Bg < 40 || c.Bg > 107) || (c.Bg > 47 && c.Bg < 100) {
+		c.Bg = 49
+	}
+	return fmt.Sprintf("\033[%s;%sm%s%s", strconv.Itoa(c.Fg), strconv.Itoa(c.Bg), v, ANSI_RESET_COLOR)
 }

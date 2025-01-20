@@ -18,6 +18,9 @@ To customize your logger experince you can modify these options in the Options s
 * Level
 * AddSource
 
+`NOTE:`When initilizing the logger you can also pass a custom theme to customize your color theme.\
+If nil then it will use the default theme
+
 ## Resources used
 * [Slog color handler guide](https://dusted.codes/creating-a-pretty-console-logger-using-gos-slog-package)
 * [Golang slog guide](https://github.com/golang/example/tree/master/slog-handler-guide)
