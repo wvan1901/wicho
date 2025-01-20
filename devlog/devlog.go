@@ -74,7 +74,8 @@ type Options struct {
 	// Levels with lower levels are discarded.
 	// If nil, the Handler uses [slog.LevelInfo].
 	Level slog.Leveler
-	// TODO: Toggle file source
+	// Enables or disables source code location
+	AddSource bool
 	// TODO: Add color custumization
 }
 
@@ -103,7 +104,7 @@ func (h *DevLogHandler) Handle(ctx context.Context, r slog.Record) error {
 
 	buf = fmt.Append(buf, handleLvl(r.Level)+" ")
 
-	if r.PC != 0 {
+	if r.PC != 0 && h.opts.AddSource {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
 		sourceStr := fmt.Sprintf(" %s:%d ", f.File, f.Line)

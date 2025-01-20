@@ -13,6 +13,12 @@ A slog handler that provides colorful logging for local development ONLY.
 * Doesn't have to be fast
 * Doesn't have to be memory efficient
 
+# Options
+To customize your logger experince you can modify these options in the Options struct:
+* Level
+* AddSource
+
 ## Resources used
 * [Slog color handler guide](https://dusted.codes/creating-a-pretty-console-logger-using-gos-slog-package)
 * [Golang slog guide](https://github.com/golang/example/tree/master/slog-handler-guide)
+* [Ansi helper](https://stackoverflow.com/questions/4842424/list-of-ansi-color-escape-sequences)
