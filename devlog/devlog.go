@@ -64,6 +64,8 @@ type Options struct {
 	AddSource bool
 	// Customizable theme
 	theme Theme
+	// Custom Prefix
+	Prefix string
 }
 
 type Theme struct {
@@ -81,6 +83,8 @@ type Theme struct {
 	Error color
 	// Source File
 	SourceFile color
+	// Prefix
+	Prefix color
 }
 
 type color struct {
@@ -111,7 +115,8 @@ func New(out io.Writer, opts *Options, theme *Theme) *DevLogHandler {
 			Info:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_CYAN},
 			Warn:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTYELLOW},
 			Error:       color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTRED},
-			SourceFile:  color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTMAGENTA},
+			SourceFile:  color{Fg: ANSI_FG_LIGHTMAGENTA, Bg: ANSI_BG_BLACK},
+			Prefix:      color{Fg: ANSI_FG_CYAN, Bg: ANSI_BG_BLACK},
 		}
 	}
 	h.opts.theme = *theme
@@ -125,6 +130,10 @@ func (h *DevLogHandler) Enabled(ctx context.Context, level slog.Level) bool {
 
 func (h *DevLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	buf := make([]byte, 0, 1024)
+	if h.opts.Prefix != "" {
+		prefixStr := colorSimple(h.opts.theme.Prefix, h.opts.Prefix)
+		buf = fmt.Append(buf, prefixStr+" ")
+	}
 	if !r.Time.IsZero() {
 		buf = h.appendAttr(buf, slog.Time(slog.TimeKey, r.Time))
 	}
@@ -134,9 +143,9 @@ func (h *DevLogHandler) Handle(ctx context.Context, r slog.Record) error {
 	if r.PC != 0 && h.opts.AddSource {
 		fs := runtime.CallersFrames([]uintptr{r.PC})
 		f, _ := fs.Next()
-		sourceStr := fmt.Sprintf(" %s:%d ", f.File, f.Line)
+		sourceStr := fmt.Sprintf("%s:%d ", f.File, f.Line)
 		colorVal := colorSimple(h.opts.theme.SourceFile, sourceStr)
-		buf = fmt.Append(buf, colorVal+" ")
+		buf = fmt.Append(buf, colorVal)
 	}
 	buf = h.appendAttr(buf, slog.String(slog.MessageKey, r.Message))
 
