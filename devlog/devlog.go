@@ -109,7 +109,7 @@ func New(out io.Writer, opts *Options, theme *Theme) *DevLogHandler {
 			Time:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTGREEN},
 			Bool:        color{Fg: ANSI_FG_LIGHTRED, Bg: ANSI_BG_BLACK},
 			Int:         color{Fg: ANSI_FG_LIGHTCYAN, Bg: ANSI_BG_BLACK},
-			Group:       color{Fg: ANSI_FG_WHITE, Bg: ANSI_BG_BLUE},
+			Group:       color{Fg: ANSI_FG_DARKGRAY, Bg: ANSI_BG_BLACK},
 			AttrDefault: color{Fg: ANSI_FG_LIGHTGREEN, Bg: ANSI_BG_BLACK},
 			Debug:       color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_DARKGRAY},
 			Info:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_CYAN},
@@ -210,17 +210,15 @@ func (h *DevLogHandler) appendAttr(buf []byte, a slog.Attr) []byte {
 		// If key is non empty, write it out
 		// Otherwise inline the attrs
 		if a.Key != "" {
-			keyStr := colorSimple(h.opts.theme.Group, " "+a.Key+" ")
-			startStr := colorSimple(color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_GREEN}, " START ")
-			buf = fmt.Appendf(buf, "%s%s ", keyStr, startStr)
+			keyStr := colorSimple(h.opts.theme.Group, a.Key+"->{")
+			buf = fmt.Appendf(buf, "%s ", keyStr)
 		}
 		for _, ga := range attrs {
 			buf = h.appendAttr(buf, ga)
 		}
 		if a.Key != "" {
-			keyStr := colorSimple(h.opts.theme.Group, " "+a.Key+" ")
-			endStr := colorSimple(color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_RED}, " END ")
-			buf = fmt.Appendf(buf, "%s%s", keyStr, endStr)
+			keyStr := colorSimple(h.opts.theme.Group, "}<-"+a.Key)
+			buf = fmt.Appendf(buf, "%s", keyStr)
 		}
 	default:
 		keyStr := colorSimple(h.opts.theme.AttrDefault, a.Key)
