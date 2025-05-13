@@ -106,7 +106,7 @@ func New(out io.Writer, opts *Options, theme *Theme) *DevLogHandler {
 		// Set the default theme
 		theme = &Theme{
 			String:      color{Fg: ANSI_FG_LIGHTBLUE, Bg: ANSI_BG_BLACK},
-			Time:        color{Fg: ANSI_FG_BLACK, Bg: ANSI_BG_LIGHTGREEN},
+			Time:        color{Fg: ANSI_FG_LIGHTGREEN, Bg: ANSI_BG_BLACK},
 			Bool:        color{Fg: ANSI_FG_LIGHTRED, Bg: ANSI_BG_BLACK},
 			Int:         color{Fg: ANSI_FG_LIGHTCYAN, Bg: ANSI_BG_BLACK},
 			Group:       color{Fg: ANSI_FG_DARKGRAY, Bg: ANSI_BG_BLACK},
@@ -192,7 +192,7 @@ func (h *DevLogHandler) appendAttr(buf []byte, a slog.Attr) []byte {
 		buf = fmt.Append(buf, keyStr+"="+a.Value.String())
 	case slog.KindTime:
 		// Write the time in a standard way
-		timeStr := fmt.Sprintf("%s", a.Value.Time().Format(TIME_FORMAT))
+		timeStr := a.Value.Time().Format(TIME_FORMAT)
 		colorStr := colorSimple(h.opts.theme.Time, timeStr)
 		buf = fmt.Append(buf, colorStr)
 	case slog.KindBool:
